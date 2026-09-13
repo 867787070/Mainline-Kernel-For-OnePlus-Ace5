@@ -793,19 +793,44 @@
 };
 
 /*
- * Unlike QRD (USB retimer), giulia's i2c6 carries the NFC controller
- * (downstream "nq@64", NXP NQ/SN NCI family). Add once basic bringup works.
+ * NFC: NXP SN220T, attached to QUPv3 SE0.
+ *
+ * Downstream (oplus) giulia_nfc.dtsi puts the controller on &qupv3_se0_i2c,
+ * which is i2c@a80000 -> upstream i2c0 (SE0).  It is NOT on i2c6:
+ * i2c6 is SE6 (i2c@a98000) and downstream only populates SE6 on the QRD
+ * board, not on giulia.
+ *
+ * Downstream reference (oplus/oplus_nfc/giulia_nfc.dtsi):
+ *	nq@28 {
+ *		compatible = "qcom,sn-nci";
+ *		reg = <0x28>;
+ *		qcom,sn-irq    = <&tlmm 75 0>;
+ *		qcom,sn-ven    = <&tlmm 34 0>;
+ *		qcom,sn-clkreq = <&tlmm 35 0>;
+ *		nxp,sn-vbat    = <&tlmm 177 0>;
+ *	};
  */
-&i2c6 {
+&i2c0 {
 	status = "okay";
+	clock-frequency = <400000>;
 
-	/*
-	 * nfc@28 {
-	 *	compatible = "nxp,sn220", "nxp,nxp-nci-i2c";
-	 *	... TODO: verify address (downstream reg 0x64?), IRQ/VEN/DWL
-	 *	GPIOs from downstream nfc pinctrl (nfc_int/nfc_enable states)
-	 * };
-	 */
+	nfc@28 {
+		compatible = "nxp,sn220", "nxp,nxp-nci-i2c";
+		reg = <0x28>;
+
+		interrupt-parent = <&tlmm>;
+		interrupts = <75 IRQ_TYPE_LEVEL_HIGH>;
+
+		enable-gpios = <&tlmm 34 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&nfc_int_default>, <&nfc_enable_default>;
+	};
+};
+
+/* i2c6 (SE6) carries no known device on giulia. */
+&i2c6 {
+	status = "disabled";
 };
 
 &i2c8 {
@@ -1204,6 +1229,21 @@
 
 &tlmm {
 	gpio-reserved-ranges = <36 4>, <74 1>;
+
+	/* NFC: SN220T IRQ (gpio75) + VEN/CLKREQ (gpio34/35), per downstream nfc pinctrl */
+	nfc_int_default: nfc-int-default-state {
+		pins = "gpio75";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	nfc_enable_default: nfc-enable-default-state {
+		pins = "gpio34", "gpio35";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
 
 	bt_default: bt-default-state {
 		bt-en-pins {
