@@ -16,7 +16,7 @@
 #include "pmk8550.dtsi"
 #include "pmr735d_a.dtsi"
 
-// /delete-node/ &rmtfs_mem;
+/* /delete-node/ &rmtfs_mem; */
 /delete-node/ &hwfence_shbuf;
 /delete-node/ &adspslpi_mem;
 
@@ -30,14 +30,14 @@
 	};
 
 	chosen {
-		// stdout-path = "serial0:115200n8";
+		/* stdout-path = "serial0:115200n8"; */
 	};
 
 	gpio-keys {
 		compatible = "gpio-keys";
 
-		pinctrl-0 = <&volume_down_n>;
 		pinctrl-names = "default";
+		pinctrl-0 = <&volume_down_n>;
 
 		key-volume-down {
 			label = "Volume Down";
@@ -51,11 +51,12 @@
 
 	pmic-glink {
 		compatible = "oplus,sm8650-pmic-glink",
-			     "qcom,sm8650-pmic-glink",
-			     "qcom,sm8550-pmic-glink",
-			     "qcom,pmic-glink";
+					 "qcom,sm8650-pmic-glink",
+					 "qcom,sm8550-pmic-glink",
+					 "qcom,pmic-glink";
 		#address-cells = <1>;
 		#size-cells = <0>;
+
 		orientation-gpios = <&tlmm 29 GPIO_ACTIVE_HIGH>;
 
 		connector@0 {
@@ -87,40 +88,25 @@
 			};
 		};
 	};
-	
-    hypervisor {
-    	#address-cells = <2>;
-    	#size-cells = <0>;
-    	compatible = "gunyah-hypervisor";
-    	    
-    	gunyah-resource-mgr@0 {
-    		compatible = "gunyah-resource-manager";
-    
-    		reg = <0x831f2ab7 0x189a43c1>,
-    		      <0x831f2ab7 0x189a807c>;
-    
-    		interrupts = <GIC_SPI 928 IRQ_TYPE_LEVEL_HIGH 0>,
-                     <GIC_SPI 929 IRQ_TYPE_LEVEL_HIGH 0>;
-    	};
-    };
 
 	sound {
 		compatible = "qcom,sm8650-sndcard", "qcom,sm8450-sndcard";
 		model = "oneplus-giulia";
 
-		pinctrl-0 = <&mi2s1_default>;
 		pinctrl-names = "default";
+		pinctrl-0 = <&mi2s1_default>;
+
 		audio-routing = "IN1_HPHL", "HPHL_OUT",
-				"IN2_HPHR", "HPHR_OUT",
-				"AMIC1", "MIC BIAS1",
-				"AMIC2", "MIC BIAS2",
-				"AMIC3", "MIC BIAS3",
-				"AMIC4", "MIC BIAS3",
-				"AMIC5", "MIC BIAS4",
-				"TX SWR_INPUT0", "ADC1_OUTPUT",
-				"TX SWR_INPUT1", "ADC2_OUTPUT",
-				"TX SWR_INPUT2", "ADC3_OUTPUT",
-				"TX SWR_INPUT3", "ADC4_OUTPUT";
+						"IN2_HPHR", "HPHR_OUT",
+						"AMIC1", "MIC BIAS1",
+						"AMIC2", "MIC BIAS2",
+						"AMIC3", "MIC BIAS3",
+						"AMIC4", "MIC BIAS3",
+						"AMIC5", "MIC BIAS4",
+						"TX SWR_INPUT0", "ADC1_OUTPUT",
+						"TX SWR_INPUT1", "ADC2_OUTPUT",
+						"TX SWR_INPUT2", "ADC3_OUTPUT",
+						"TX SWR_INPUT3", "ADC4_OUTPUT";
 
 		wcd-playback-dai-link {
 			link-name = "WCD Playback";
@@ -155,8 +141,8 @@
 		};
 
 		/*
-		 * Speakers: 2x SI-IN SIA9177 smart PA on Secondary MI2S
-		 * (giulia has no WSA884x).
+		 * Speakers: 2x SI-IN SIA9177 smart PA on Secondary MI2S.
+		 * giulia has no WSA884x.
 		 */
 		mi2s-dai-link {
 			link-name = "MI2S Secondary Playback";
@@ -189,8 +175,8 @@
 	wcd939x: audio-codec {
 		compatible = "qcom,wcd9395-codec", "qcom,wcd9390-codec";
 
-		pinctrl-0 = <&wcd_default>;
 		pinctrl-names = "default";
+		pinctrl-0 = <&wcd_default>;
 
 		qcom,micbias1-microvolt = <1800000>;
 		qcom,micbias2-microvolt = <1800000>;
@@ -283,20 +269,24 @@
 		};
 	};
 
-	// Panel VCI output enable
+	/* Panel VCI output enable */
 	panel_vout: regulator-panel-vout {
 		compatible = "regulator-fixed";
+
 		regulator-name = "panel_vout";
+
 		gpio = <&tlmm 91 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 	};
 
-	// Touch analog rail behind GPIO 108
+	/* Touch analog rail behind GPIO 108 */
 	ts_avdd: regulator-ts-avdd {
 		compatible = "regulator-fixed";
+
 		regulator-name = "ts_avdd";
 		regulator-min-microvolt = <3008000>;
 		regulator-max-microvolt = <3008000>;
+
 		gpio = <&tlmm 108 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 	};
@@ -305,6 +295,7 @@
 &apps_rsc {
 	regulators-0 {
 		compatible = "qcom,pm8550-rpmh-regulators";
+		qcom,pmic-id = "b";
 
 		vdd-bob1-supply = <&vph_pwr>;
 		vdd-bob2-supply = <&vph_pwr>;
@@ -317,8 +308,6 @@
 		vdd-l12-supply = <&vreg_s6c_1p8>;
 		vdd-l15-supply = <&vreg_s6c_1p8>;
 		vdd-l17-supply = <&vreg_bob2>;
-
-		qcom,pmic-id = "b";
 
 		vreg_bob1: bob1 {
 			regulator-name = "vreg_bob1";
@@ -334,6 +323,13 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 		};
 
+		vreg_l1b_1p8: ldo1 {
+			regulator-name = "vreg_l1b_1p8";
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
 		vreg_l2b_3p0: ldo2 {
 			regulator-name = "vreg_l2b_3p0";
 			regulator-min-microvolt = <3008000>;
@@ -341,7 +337,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l4b_1p8: ldo4 {
@@ -358,7 +354,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l6b_1p8: ldo6 {
@@ -368,7 +364,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l7b_1p8: ldo7 {
@@ -385,7 +381,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l9b_2p9: ldo9 {
@@ -395,7 +391,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l11b_1p2: ldo11 {
@@ -405,7 +401,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l12b_1p8: ldo12 {
@@ -415,7 +411,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l13b_3p0: ldo13 {
@@ -425,7 +421,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l14b_3p2: ldo14 {
@@ -435,7 +431,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l15b_1p8: ldo15 {
@@ -445,7 +441,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l16b_2p8: ldo16 {
@@ -455,7 +451,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l17b_2p5: ldo17 {
@@ -465,12 +461,13 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 	};
 
 	regulators-1 {
 		compatible = "qcom,pm8550vs-rpmh-regulators";
+		qcom,pmic-id = "c";
 
 		vdd-l1-supply = <&vreg_s1c_1p2>;
 		vdd-l2-supply = <&vreg_s1c_1p2>;
@@ -481,8 +478,6 @@
 		vdd-s4-supply = <&vph_pwr>;
 		vdd-s5-supply = <&vph_pwr>;
 		vdd-s6-supply = <&vph_pwr>;
-
-		qcom,pmic-id = "c";
 
 		vreg_s1c_1p2: smps1 {
 			regulator-name = "vreg_s1c_1p2";
@@ -533,7 +528,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l3c_1p2: ldo3 {
@@ -543,16 +538,15 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 	};
 
 	regulators-2 {
 		compatible = "qcom,pm8550vs-rpmh-regulators";
+		qcom,pmic-id = "d";
 
 		vdd-l1-supply = <&vreg_s3c_0p9>;
-
-		qcom,pmic-id = "d";
 
 		vreg_l1d_0p88: ldo1 {
 			regulator-name = "vreg_l1d_0p88";
@@ -561,16 +555,15 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 	};
 
 	regulators-3 {
 		compatible = "qcom,pm8550vs-rpmh-regulators";
+		qcom,pmic-id = "e";
 
 		vdd-l3-supply = <&vreg_s3c_0p9>;
-
-		qcom,pmic-id = "e";
 
 		vreg_l3e_0p9: ldo3 {
 			regulator-name = "vreg_l3e_0p9";
@@ -579,17 +572,16 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 	};
 
 	regulators-4 {
 		compatible = "qcom,pm8550vs-rpmh-regulators";
+		qcom,pmic-id = "g";
 
 		vdd-l1-supply = <&vreg_s3c_0p9>;
 		vdd-l3-supply = <&vreg_s3c_0p9>;
-
-		qcom,pmic-id = "g";
 
 		vreg_l1g_0p91: ldo1 {
 			regulator-name = "vreg_l1g_0p91";
@@ -598,7 +590,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l3g_0p91: ldo3 {
@@ -608,19 +600,18 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 	};
 
 	regulators-5 {
 		compatible = "qcom,pm8550ve-rpmh-regulators";
+		qcom,pmic-id = "i";
 
 		vdd-l1-supply = <&vreg_s3c_0p9>;
 		vdd-l2-supply = <&vreg_s3c_0p9>;
 		vdd-l3-supply = <&vreg_s1c_1p2>;
 		vdd-s4-supply = <&vph_pwr>;
-
-		qcom,pmic-id = "i";
 
 		vreg_s4i_0p85: smps4 {
 			regulator-name = "vreg_s4i_0p85";
@@ -636,7 +627,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l2i_0p88: ldo2 {
@@ -646,7 +637,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l3i_1p2: ldo3 {
@@ -656,7 +647,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 	};
 
@@ -677,7 +668,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l2m_1p056: ldo2 {
@@ -687,7 +678,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
+									   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l3m_2p8: ldo3 {
@@ -726,12 +717,12 @@
 		};
 	};
 
-	// pm8010_n isn't present
+	/* pm8010_n isn't present */
 };
 
 /*
- * Cameras differ from QRD (giulia: 50MP main LYT-700 + 8MP UW + 2MP macro,
- * powered by pm8010m/n rails). Leave CAMSS/CCI enabled for bringup, add
+ * Cameras differ from QRD: giulia has 50MP main LYT-700 + 8MP UW + 2MP macro,
+ * powered by pm8010m/n rails. Leave CAMSS/CCI enabled for bringup, add
  * sensors later from downstream cam_sensor nodes.
  */
 &camss {
@@ -801,9 +792,9 @@
 
 	/*
 	 * nfc@28 {
-	 *	compatible = "nxp,sn220", "nxp,nxp-nci-i2c";
-	 *	... TODO: verify address (downstream reg 0x64?), IRQ/VEN/DWL
-	 *	GPIOs from downstream nfc pinctrl (nfc_int/nfc_enable states)
+	 *	   compatible = "nxp,sn220", "nxp,nxp-nci-i2c";
+	 *	   ... TODO: verify address (downstream reg 0x64?), IRQ/VEN/DWL
+	 *	   GPIOs from downstream nfc pinctrl (nfc_int/nfc_enable states)
 	 * };
 	 */
 };
@@ -823,7 +814,7 @@
 };
 
 &i2c_hub_7 {
-	clock-frequency = <400000>;	/* downstream qcom,clk-freq-out = 400 kHz */
+	clock-frequency = <400000>; /* downstream qcom,clk-freq-out = 400 kHz */
 
 	status = "okay";
 
@@ -833,12 +824,13 @@
 		reg = <0x6c>;
 
 		reset-gpios = <&tlmm 173 GPIO_ACTIVE_HIGH>;
+
 		si,channel = <0>;
 		sound-name-prefix = "SpkrLeft";
 		#sound-dai-cells = <0>;
 
-		pinctrl-0 = <&spkr_l_reset_default>;
 		pinctrl-names = "default";
+		pinctrl-0 = <&spkr_l_reset_default>;
 	};
 
 	speaker_r: amplifier@6d {
@@ -846,12 +838,13 @@
 		reg = <0x6d>;
 
 		reset-gpios = <&tlmm 178 GPIO_ACTIVE_HIGH>;
+
 		si,channel = <1>;
 		sound-name-prefix = "SpkrRight";
 		#sound-dai-cells = <0>;
 
-		pinctrl-0 = <&spkr_r_reset_default>;
 		pinctrl-names = "default";
+		pinctrl-0 = <&spkr_r_reset_default>;
 	};
 };
 
@@ -874,38 +867,41 @@
 	firmware-name = "qcom/sm8650/oneplus/giulia/gen70900_zap.mbn";
 };
 
-// &lpass_tlmm {
-// 	/*
-// 	 * Secondary MI2S out to the SIA9177 PAs. Downstream drives these
-// 	 * pins from LPI TDM1 (gpio6 sck / gpio7 ws / gpio8 data).
-// 	 * If the build errors on the function names, check
-// 	 * drivers/pinctrl/qcom/pinctrl-sm8650-lpass-lpi.c (i2s1_* vs mi2s1_*).
-// 	 */
-// 	mi2s1_default: mi2s1-default-state {
-// 		sck-pins {
-// 			pins = "gpio6";
-// 			function = "i2s1_clk";
-// 			drive-strength = <8>;
-// 			bias-disable;
-// 		};
-
-// 		ws-pins {
-// 			pins = "gpio7";
-// 			function = "i2s1_ws";
-// 			drive-strength = <8>;
-// 			bias-disable;
-// 		};
-
-// 		data-pins {
-// 			pins = "gpio8";
-// 			function = "i2s1_data";
-// 			drive-strength = <8>;
-// 			bias-disable;
-// 		};
-// 	};
-// };
+/*
+ * &lpass_tlmm {
+ *	   Secondary MI2S out to the SIA9177 PAs. Downstream drives these
+ *	   pins from LPI TDM1 (gpio6 sck / gpio7 ws / gpio8 data).
+ *	   If the build errors on the function names, check
+ *	   drivers/pinctrl/qcom/pinctrl-sm8650-lpass-lpi.c (i2s1_* vs mi2s1_*).
+ *
+ *	   mi2s1_default: mi2s1-default-state {
+ *		   sck-pins {
+ *			   pins = "gpio6";
+ *			   function = "i2s1_clk";
+ *			   drive-strength = <8>;
+ *			   bias-disable;
+ *		   };
+ *
+ *		   ws-pins {
+ *			   pins = "gpio7";
+ *			   function = "i2s1_ws";
+ *			   drive-strength = <8>;
+ *			   bias-disable;
+ *		   };
+ *
+ *		   data-pins {
+ *			   pins = "gpio8";
+ *			   function = "i2s1_data";
+ *			   drive-strength = <8>;
+ *			   bias-disable;
+ *		   };
+ *	   };
+ * };
+ */
 
 &tlmm {
+	gpio-reserved-ranges = <36 4>, <74 1>;
+
 	mi2s1_default: mi2s1-default-state {
 		sck-pins {
 			pins = "gpio121";
@@ -935,6 +931,102 @@
 			bias-disable;
 		};
 	};
+
+	bt_default: bt-default-state {
+		bt-en-pins {
+			pins = "gpio17";
+			function = "gpio";
+			drive-strength = <16>;
+			bias-disable;
+		};
+
+		sw-ctrl-pins {
+			pins = "gpio18";
+			function = "gpio";
+			bias-pull-down;
+		};
+	};
+
+	disp0_reset_n_active: disp0-reset-n-active-state {
+		pins = "gpio133";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	disp0_reset_n_suspend: disp0-reset-n-suspend-state {
+		pins = "gpio133";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	mdp_vsync: mdp-vsync-state {
+		pins = "gpio86";
+		function = "mdp_vsync";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	sc8547_master_int_default: sc8547-master-int-default-state {
+		pins = "gpio8";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-up;
+		input-enable;
+	};
+
+	sc8547_slave_int_default: sc8547-slave-int-default-state {
+		pins = "gpio15";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-up;
+		input-enable;
+	};
+
+	spkr_l_reset_default: spkr-l-reset-default-state {
+		pins = "gpio173";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	spkr_r_reset_default: spkr-r-reset-default-state {
+		pins = "gpio178";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	ts_irq: ts-irq-state {
+		pins = "gpio162";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+		output-disable;
+	};
+
+	ts_reset: ts-reset-state {
+		pins = "gpio161";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	wcd_default: wcd-reset-n-active-state {
+		pins = "gpio107";
+		function = "gpio";
+		drive-strength = <16>;
+		bias-disable;
+		output-low;
+	};
+
+	wlan_en: wlan-en-state {
+		pins = "gpio16";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-down;
+	};
 };
 
 &mdss {
@@ -955,9 +1047,9 @@
 
 		reset-gpios = <&tlmm 133 GPIO_ACTIVE_LOW>;
 
+		pinctrl-names = "default", "sleep";
 		pinctrl-0 = <&disp0_reset_n_active>, <&mdp_vsync>;
 		pinctrl-1 = <&disp0_reset_n_suspend>, <&mdp_vsync>;
-		pinctrl-names = "default", "sleep";
 
 		port {
 			panel0_in: endpoint {
@@ -981,8 +1073,8 @@
 	wake-gpios = <&tlmm 96 GPIO_ACTIVE_HIGH>;
 	perst-gpios = <&tlmm 94 GPIO_ACTIVE_LOW>;
 
-	pinctrl-0 = <&pcie0_default_state>;
 	pinctrl-names = "default";
+	pinctrl-0 = <&pcie0_default_state>;
 
 	status = "okay";
 };
@@ -1021,7 +1113,7 @@
 	status = "okay";
 };
 
-// Not present on giulia
+/* Not present on giulia */
 &pm8010_n {
 	status = "disabled";
 };
@@ -1086,21 +1178,21 @@
 
 &remoteproc_adsp {
 	firmware-name = "qcom/sm8650/oneplus/giulia/adsp.mbn",
-			"qcom/sm8650/oneplus/giulia/adsp_dtb.mbn";
+					"qcom/sm8650/oneplus/giulia/adsp_dtb.mbn";
 
 	status = "okay";
 };
 
 &remoteproc_cdsp {
 	firmware-name = "qcom/sm8650/oneplus/giulia/cdsp.mbn",
-			"qcom/sm8650/oneplus/giulia/cdsp_dtb.mbn";
+					"qcom/sm8650/oneplus/giulia/cdsp_dtb.mbn";
 
 	status = "okay";
 };
 
 &remoteproc_mpss {
 	firmware-name = "qcom/sm8650/oneplus/giulia/modem.mbn",
-			"qcom/sm8650/oneplus/giulia/modem_dtb.mbn";
+					"qcom/sm8650/oneplus/giulia/modem_dtb.mbn";
 
 	status = "okay";
 };
@@ -1112,7 +1204,7 @@
 	};
 
 	adspslpi_mem: adspslpi@9df00000 {
-		reg = <0 0x9df00000 0 0x5280000>;
+		reg = <0x0 0x9df00000 0x0 0x5280000>;
 		no-map;
 	};
 
@@ -1143,18 +1235,23 @@
 		interrupts-extended = <&tlmm 162 IRQ_TYPE_LEVEL_LOW>;
 
 		reset-gpios = <&tlmm 161 GPIO_ACTIVE_LOW>;
-		// Downstream vdd-supply phandle resolves to pm_humu_l4 (LDO B4,
-		// 1.8V) = vreg_l4b_1p8 in upstream sm8650 naming, NOT L12B.
+
+		/*
+		 * Downstream vdd-supply phandle resolves to pm_humu_l4 (LDO B4,
+		 * 1.8V) = vreg_l4b_1p8 in upstream sm8650 naming, NOT L12B.
+		 */
 		vdd-supply = <&vreg_l4b_1p8>;
 		avdd-supply = <&ts_avdd>;
 
-		pinctrl-0 = <&ts_irq>, <&ts_reset>;
 		pinctrl-names = "default";
+		pinctrl-0 = <&ts_irq>, <&ts_reset>;
 
-		// NOTE: do NOT add touchscreen-size-x/y = <1264/2780> here.
-		// Firmware reports coordinates in 1/16 pixel units
-		// (max_x/max_y ~ 20223 x 44479, taken from the chip at probe);
-		// userspace scales automatically from the reported abs range.
+		/*
+		 * NOTE: do NOT add touchscreen-size-x/y = <1264/2780> here.
+		 * Firmware reports coordinates in 1/16 pixel units
+		 * (max_x/max_y ~ 20223 x 44479, taken from the chip at probe);
+		 * userspace scales automatically from the reported abs range.
+		 */
 	};
 };
 
@@ -1173,11 +1270,11 @@
 		reg = <0 4>;
 
 		/*
-		 * WCD9395 RX Port 1 (HPH_L/R)      <=> SWR1 Port 1 (HPH_L/R)
-		 * WCD9395 RX Port 2 (CLSH)         <=> SWR1 Port 2 (CLSH)
-		 * WCD9395 RX Port 3 (COMP_L/R)     <=> SWR1 Port 3 (COMP_L/R)
-		 * WCD9395 RX Port 4 (LO)           <=> SWR1 Port 4 (LO)
-		 * WCD9395 RX Port 5 (DSD_L/R)      <=> SWR1 Port 5 (DSD_L/R)
+		 * WCD9395 RX Port 1 (HPH_L/R)		<=> SWR1 Port 1 (HPH_L/R)
+		 * WCD9395 RX Port 2 (CLSH)			<=> SWR1 Port 2 (CLSH)
+		 * WCD9395 RX Port 3 (COMP_L/R)		<=> SWR1 Port 3 (COMP_L/R)
+		 * WCD9395 RX Port 4 (LO)			<=> SWR1 Port 4 (LO)
+		 * WCD9395 RX Port 5 (DSD_L/R)		<=> SWR1 Port 5 (DSD_L/R)
 		 * WCD9395 RX Port 6 (HIFI_PCM_L/R) <=> SWR1 Port 9 (HIFI_PCM_L/R)
 		 */
 		qcom,rx-port-mapping = <1 2 3 4 5 9>;
@@ -1193,96 +1290,12 @@
 		reg = <0 3>;
 
 		/*
-		 * WCD9395 TX Port 1 (ADC1,2,3,4)         <=> SWR2 Port 2 (TX SWR_INPUT 0,1,2,3)
-		 * WCD9395 TX Port 2 (ADC3,4 & DMIC0,1)   <=> SWR2 Port 2 (TX SWR_INPUT 0,1,2,3)
+		 * WCD9395 TX Port 1 (ADC1,2,3,4)		  <=> SWR2 Port 2 (TX SWR_INPUT 0,1,2,3)
+		 * WCD9395 TX Port 2 (ADC3,4 & DMIC0,1)	  <=> SWR2 Port 2 (TX SWR_INPUT 0,1,2,3)
 		 * WCD9395 TX Port 3 (DMIC0,1,2,3 & MBHC) <=> SWR2 Port 3 (TX SWR_INPUT 4,5,6,7)
-		 * WCD9395 TX Port 4 (DMIC4,5,6,7)        <=> SWR2 Port 4 (TX SWR_INPUT 8,9,10,11)
+		 * WCD9395 TX Port 4 (DMIC4,5,6,7)		  <=> SWR2 Port 4 (TX SWR_INPUT 8,9,10,11)
 		 */
 		qcom,tx-port-mapping = <2 2 3 4>;
-	};
-};
-
-&tlmm {
-	gpio-reserved-ranges = <36 4>, <74 1>;
-
-	bt_default: bt-default-state {
-		bt-en-pins {
-			pins = "gpio17";
-			function = "gpio";
-			drive-strength = <16>;
-			bias-disable;
-		};
-
-		sw-ctrl-pins {
-			pins = "gpio18";
-			function = "gpio";
-			bias-pull-down;
-		};
-	};
-
-	disp0_reset_n_active: disp0-reset-n-active-state {
-		pins = "gpio133";
-		function = "gpio";
-		drive-strength = <8>;
-		bias-disable;
-	};
-
-	disp0_reset_n_suspend: disp0-reset-n-suspend-state {
-		pins = "gpio133";
-		function = "gpio";
-		drive-strength = <2>;
-		bias-pull-down;
-	};
-
-	mdp_vsync: mdp-vsync-state {
-		pins = "gpio86";
-		function = "mdp_vsync";
-		drive-strength = <2>;
-		bias-pull-down;
-	};
-
-	spkr_l_reset_default: spkr-l-reset-default-state {
-		pins = "gpio173";
-		function = "gpio";
-		drive-strength = <2>;
-		bias-disable;
-	};
-
-	spkr_r_reset_default: spkr-r-reset-default-state {
-		pins = "gpio178";
-		function = "gpio";
-		drive-strength = <2>;
-		bias-disable;
-	};
-
-	ts_irq: ts-irq-state {
-		pins = "gpio162";
-		function = "gpio";
-		drive-strength = <8>;
-		bias-pull-up;
-		output-disable;
-	};
-
-	ts_reset: ts-reset-state {
-		pins = "gpio161";
-		function = "gpio";
-		drive-strength = <8>;
-		bias-pull-up;
-	};
-
-	wcd_default: wcd-reset-n-active-state {
-		pins = "gpio107";
-		function = "gpio";
-		drive-strength = <16>;
-		bias-disable;
-		output-low;
-	};
-
-	wlan_en: wlan-en-state {
-		pins = "gpio16";
-		function = "gpio";
-		drive-strength = <8>;
-		bias-pull-down;
 	};
 };
 
@@ -1362,4 +1375,93 @@
 
 &xo_board {
 	clock-frequency = <76800000>;
+};
+
+/* ---------- SC8547 双电荷泵 ---------- */
+&i2c_hub_2 {
+	status = "okay";
+	clock-frequency = <400000>;
+
+	sc8547_master: charger@6a {
+		compatible = "southchip,sc8547";
+		reg = <0x6a>;
+
+		southchip,master;
+
+		ovp_reg = <0x36>;
+		ocp_reg = <0x0e>;
+		oplus,pps_ocp_max = <3600>;
+
+		interrupt-parent = <&tlmm>;
+		interrupts = <8 IRQ_TYPE_EDGE_FALLING>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&sc8547_master_int_default>;
+	};
+};
+
+&i2c_hub_4 {
+	status = "okay";
+	clock-frequency = <400000>;
+
+	sc8547_slave: charger@6a {
+		compatible = "southchip,sc8547";
+		reg = <0x6a>;
+
+		ovp_reg = <0x36>;
+		ocp_reg = <0x0e>;
+		oplus,pps_ocp_max = <3600>;
+
+		interrupt-parent = <&tlmm>;
+		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&sc8547_slave_int_default>;
+	};
+};
+
+/* ---------- AK09970 hall-effect slider ---------- */
+&i2c_hub_8 {
+	status = "okay";
+	clock-frequency = <400000>;
+
+	magnetometer: magnetometer@10 {
+		compatible = "asahi-kasei,ak09970";
+		reg = <0x10>;
+
+		vdd-supply = <&vreg_l1b_1p8>;
+		vddio-supply = <&vreg_l1b_1p8>;
+
+		#io-channel-cells = <1>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&hall_interrupt_input>;
+	};
+};
+
+/ {
+    ak09970-slider {
+    	compatible = "oneplus,ak09970-slider";
+    
+    	io-channels = <&magnetometer 0>,
+    		      <&magnetometer 1>,
+    		      <&magnetometer 2>;
+    	io-channel-names = "x", "y", "z";
+    
+    	oneplus,up-threshold = <5000>;
+    	oneplus,mid-threshold = <22000>;
+    
+    	interrupt-parent = <&tlmm>;
+    	interrupts = <99 IRQ_TYPE_LEVEL_LOW>;
+	};
+};
+
+&tlmm {
+	hall_interrupt_input: hall-interrupt-input-state {
+		pins = "gpio99";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-up;
+		input-enable;
+	};
 };

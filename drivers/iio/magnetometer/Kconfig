@@ -54,6 +54,29 @@ config AK09911
 	help
 	  Deprecated: AK09911 is now supported by AK8975 driver.
 
+config AK09970
+	tristate "Asahi Kasei AK09970 3-axis Magnetic Sensor"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  Say yes here to build support for the Asahi Kasei AK09970
+	  3-axis magnetic sensor, used as a hall-effect slider on
+	  some smartphones.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ak09970.
+
+config AK09970_SLIDER
+	tristate "AK09970 alert slider (OnePlus Ace 5)"
+	depends on AK09970 && INPUT
+	help
+	  Slider driver that consumes X/Y/Z channels from the AK09970
+	  IIO driver and reports the three-way switch position as
+	  input switches. Used on the OnePlus Ace 5.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ak09970-slider.
+
 config ALS31300
 	tristate "Allegro MicroSystems ALS31300 3-D Linear Hall Effect Sensor"
 	depends on I2C

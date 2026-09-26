@@ -5,6 +5,7 @@
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/auxiliary_bus.h>
+#include <linux/devm-helpers.h>
 #include <linux/jiffies.h>
 #include <linux/kstrtox.h>
 #include <linux/minmax.h>
@@ -103,7 +104,19 @@ enum qcom_battmgr_variant {
 /* Oplus-specific usb property: write 1/0 to source VBUS for OTG */
 #define USB_OPLUS_OTG_VBUS_ENABLE	24
 
-/* Oplus-specific battery property: kicks the ADSP charger/gauge interface */
+/*
+ * Oplus PPS properties (extracted from downstream oplus_hal_adsp.h
+ * enum usb_property_id). Values are in mV / mA.
+ */
+#define USB_SET_PPS_VOLT		34
+#define USB_SET_PPS_CURR		35
+
+/*
+ * Oplus battery properties (extracted from downstream
+ * enum battery_property_id).
+ */
+#define BATT_SET_PDO			25
+#define BATT_AP_FASTCHG_ALLOW		46
 #define BATT_OPLUS_ADSP_GAUGE_INIT	38
 
 /* Oplus-specific request: read the OEM status buffer (see keepalive worker) */
@@ -111,6 +124,20 @@ enum qcom_battmgr_variant {
 #define BATTMGR_OPLUS_OEM_BUFFER_WORDS	128
 
 #define BATTMGR_OPLUS_KEEPALIVE_INTERVAL_MS	5000
+
+/*
+ * PPS keepalive tuning:
+ *   - ADSP drops VBUS back to 5V within ~2-3s if AP stops re-requesting PPS,
+ *     so we must re-send USB_SET_PPS_VOLT/CURR periodically.
+ *   - Target voltage tracks the battery: Vpps = 2 * Vbat + margin.
+ *   - Margin covers the 2:1 CP drop and IR loss, 400mV works well in practice.
+ */
+#define OPLUS_PPS_KEEPALIVE_INTERVAL_MS	1000
+#define OPLUS_PPS_DEFAULT_VOLT_MV	9000
+#define OPLUS_PPS_DEFAULT_CURR_MA	3000
+#define OPLUS_PPS_VOLT_MARGIN_MV	1200
+#define OPLUS_PPS_VOLT_MIN_MV		5500
+#define OPLUS_PPS_VOLT_MAX_MV		11000
 
 /* QTI charger types reported in USB_ADAP_TYPE beyond the standard ones */
 #define QTI_USB_TYPE_HVDCP		0x80
@@ -366,6 +393,13 @@ struct qcom_battmgr {
 	bool otg_vbus;
 	struct delayed_work oplus_keepalive_work;
 	bool oplus_gauge_kicked;
+
+	/* Oplus PPS keepalive + dynamic voltage tracking */
+	struct delayed_work pps_keepalive_work;
+	bool pps_keepalive_running;
+	bool pps_pdo_sent;		/* have we sent 46/25 yet this session */
+	int pps_target_mv;
+	int pps_target_ma;
 
 	/*
 	 * @lock is used to prevent concurrent power supply requests to the
@@ -1034,6 +1068,9 @@ static int qcom_battmgr_usb_sm8350_update(struct qcom_battmgr *battmgr,
 	return ret;
 }
 
+static void qcom_battmgr_pps_keepalive_start(struct qcom_battmgr *battmgr);
+static void qcom_battmgr_pps_keepalive_stop(struct qcom_battmgr *battmgr);
+
 static int qcom_battmgr_usb_get_property(struct power_supply *psy,
 					 enum power_supply_property psp,
 					 union power_supply_propval *val)
@@ -1051,6 +1088,19 @@ static int qcom_battmgr_usb_get_property(struct power_supply *psy,
 		ret = qcom_battmgr_usb_sm8350_update(battmgr, psp);
 	if (ret)
 		return ret;
+	/*
+	 * Auto-manage PPS keepalive based on USB state.
+	 * USB online + PD_PPS -> start, otherwise stop.
+	 */
+	if (battmgr->variant == QCOM_BATTMGR_OPLUS_SM8650) {
+		bool want_pps = battmgr->usb.online &&
+				battmgr->usb.usb_type == POWER_SUPPLY_USB_TYPE_PD_PPS;
+
+		if (want_pps && !battmgr->pps_keepalive_running)
+			qcom_battmgr_pps_keepalive_start(battmgr);
+		else if (!want_pps && battmgr->pps_keepalive_running)
+			qcom_battmgr_pps_keepalive_stop(battmgr);
+	}
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
@@ -1292,7 +1342,7 @@ static void qcom_battmgr_sc8280xp_strcpy(char *dest, const char *src)
 		memcpy(dest, src + 1, len);
 		dest[len] = '\0';
 	} else {
-		memcpy(dest, src, BATTMGR_STRING_LEN);
+		strscpy(dest, src, BATTMGR_STRING_LEN);
 	}
 }
 
@@ -1743,7 +1793,123 @@ static void qcom_battmgr_oplus_keepalive_worker(struct work_struct *work)
 			      msecs_to_jiffies(BATTMGR_OPLUS_KEEPALIVE_INTERVAL_MS));
 }
 
-/* Manual OTG VBUS override, mostly for testing */
+/*
+ * Read the battery voltage from the AP-side fuel gauge (BQ27Z561).
+ * Returns 0 if the gauge isn't registered yet.
+ */
+static int qcom_battmgr_get_batt_voltage_uv(struct qcom_battmgr *battmgr)
+{
+	struct power_supply *psy;
+	union power_supply_propval val;
+	int ret;
+
+	psy = power_supply_get_by_name("bq27z561-0");
+	if (!psy)
+		return 0;
+
+	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &val);
+	power_supply_put(psy);
+
+	if (ret)
+		return 0;
+
+	return val.intval;
+}
+
+/*
+ * Periodic PPS keepalive + dynamic voltage tracking.
+ *
+ * ADSP stops honouring PPS requests a few seconds after the last
+ * USB_SET_PPS_VOLT/CURR write and falls back to 5V, so we re-send
+ * the current target every second. The target tracks the battery:
+ *
+ *   Vpps = 2 * Vbat + 400mV
+ *
+ * so the SC8547 charge pump always sees just enough headroom.
+ */
+static void qcom_battmgr_pps_keepalive_worker(struct work_struct *work)
+{
+	struct qcom_battmgr *battmgr = container_of(work, struct qcom_battmgr,
+					    pps_keepalive_work.work);
+	int vbat_uv, target_mv, ret = 0;
+
+	if (!battmgr->service_up || !battmgr->pps_keepalive_running)
+		return;
+
+	if (!battmgr->usb.online)
+		goto reschedule;
+
+	vbat_uv = qcom_battmgr_get_batt_voltage_uv(battmgr);
+	if (vbat_uv > 0) {
+		target_mv = 2 * (vbat_uv / 1000) + OPLUS_PPS_VOLT_MARGIN_MV;
+		target_mv = clamp(target_mv,
+				  OPLUS_PPS_VOLT_MIN_MV,
+				  OPLUS_PPS_VOLT_MAX_MV);
+	} else {
+		target_mv = OPLUS_PPS_DEFAULT_VOLT_MV;
+	}
+
+	battmgr->pps_target_mv = target_mv;
+	battmgr->pps_target_ma = OPLUS_PPS_DEFAULT_CURR_MA;
+
+	mutex_lock(&battmgr->lock);
+
+	/*
+	 * AP handshake with ADSP: only need to send once per USB session.
+	 * 46 = BATT_AP_FASTCHG_ALLOW, 25 = BATT_SET_PDO (fixed PD voltage).
+	 */
+	if (!battmgr->pps_pdo_sent) {
+		ret |= qcom_battmgr_request_property(battmgr,
+				BATTMGR_BAT_PROPERTY_SET,
+				BATT_AP_FASTCHG_ALLOW, 1);
+		ret |= qcom_battmgr_request_property(battmgr,
+				BATTMGR_BAT_PROPERTY_SET,
+				BATT_SET_PDO, OPLUS_PPS_DEFAULT_VOLT_MV);
+		if (!ret)
+			battmgr->pps_pdo_sent = true;
+	}
+
+	/* PPS voltage / current must be re-sent every cycle */
+	ret |= qcom_battmgr_request_property(battmgr,
+			BATTMGR_USB_PROPERTY_SET,
+			USB_SET_PPS_VOLT, target_mv);
+	ret |= qcom_battmgr_request_property(battmgr,
+			BATTMGR_USB_PROPERTY_SET,
+			USB_SET_PPS_CURR, OPLUS_PPS_DEFAULT_CURR_MA);
+
+	mutex_unlock(&battmgr->lock);
+
+	if (ret)
+		dev_dbg(battmgr->dev, "PPS keepalive send failed: %d\n", ret);
+
+reschedule:
+	schedule_delayed_work(&battmgr->pps_keepalive_work,
+			      msecs_to_jiffies(OPLUS_PPS_KEEPALIVE_INTERVAL_MS));
+}
+
+static void qcom_battmgr_pps_keepalive_start(struct qcom_battmgr *battmgr)
+{
+	if (battmgr->pps_keepalive_running)
+		return;
+
+	battmgr->pps_keepalive_running = true;
+	battmgr->pps_pdo_sent = false;
+	dev_info(battmgr->dev, "PPS keepalive started\n");
+	schedule_delayed_work(&battmgr->pps_keepalive_work, 0);
+}
+
+static void qcom_battmgr_pps_keepalive_stop(struct qcom_battmgr *battmgr)
+{
+	if (!battmgr->pps_keepalive_running)
+		return;
+
+	battmgr->pps_keepalive_running = false;
+	cancel_delayed_work_sync(&battmgr->pps_keepalive_work);
+	dev_info(battmgr->dev, "PPS keepalive stopped\n");
+}
+
+/* ---------- Oplus sysfs ---------- */
+
 static ssize_t otg_vbus_show(struct device *dev, struct device_attribute *attr,
 			     char *buf)
 {
@@ -1770,8 +1936,66 @@ static ssize_t otg_vbus_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RW(otg_vbus);
 
+/* Manual PPS keepalive control, mainly for debugging */
+static ssize_t pps_keepalive_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct qcom_battmgr *battmgr = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%d\n", battmgr->pps_keepalive_running);
+}
+
+static ssize_t pps_keepalive_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	struct qcom_battmgr *battmgr = dev_get_drvdata(dev);
+	bool enable;
+	int ret;
+
+	ret = kstrtobool(buf, &enable);
+	if (ret)
+		return ret;
+
+	if (enable)
+		qcom_battmgr_pps_keepalive_start(battmgr);
+	else
+		qcom_battmgr_pps_keepalive_stop(battmgr);
+
+	return count;
+}
+static DEVICE_ATTR_RW(pps_keepalive);
+
+/* Read-only PPS state dump */
+static ssize_t pps_status_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct qcom_battmgr *battmgr = dev_get_drvdata(dev);
+	int len = 0;
+
+	len += sysfs_emit_at(buf, len, "keepalive_running=%d\n",
+			     battmgr->pps_keepalive_running);
+	len += sysfs_emit_at(buf, len, "pdo_sent=%d\n",
+			     battmgr->pps_pdo_sent);
+	len += sysfs_emit_at(buf, len, "target_mv=%d\n",
+			     battmgr->pps_target_mv);
+	len += sysfs_emit_at(buf, len, "target_ma=%d\n",
+			     battmgr->pps_target_ma);
+	len += sysfs_emit_at(buf, len, "usb_online=%d\n",
+			     battmgr->usb.online);
+	len += sysfs_emit_at(buf, len, "usb_type=%d\n",
+			     battmgr->usb.usb_type);
+	len += sysfs_emit_at(buf, len, "batt_volt_uv=%d\n",
+			     qcom_battmgr_get_batt_voltage_uv(battmgr));
+
+	return len;
+}
+static DEVICE_ATTR_RO(pps_status);
+
 static struct attribute *qcom_battmgr_oplus_attrs[] = {
 	&dev_attr_otg_vbus.attr,
+	&dev_attr_pps_keepalive.attr,
+	&dev_attr_pps_status.attr,
 	NULL
 };
 
@@ -1792,8 +2016,10 @@ static void qcom_battmgr_pdr_notify(void *priv, int state)
 		}
 	} else {
 		battmgr->service_up = false;
-		if (battmgr->variant == QCOM_BATTMGR_OPLUS_SM8650)
+		if (battmgr->variant == QCOM_BATTMGR_OPLUS_SM8650) {
 			cancel_delayed_work(&battmgr->oplus_keepalive_work);
+			qcom_battmgr_pps_keepalive_stop(battmgr);
+		}
 	}
 }
 
@@ -1817,6 +2043,7 @@ static void qcom_battmgr_oplus_keepalive_cancel(void *data)
 	struct qcom_battmgr *battmgr = data;
 
 	cancel_delayed_work_sync(&battmgr->oplus_keepalive_work);
+	cancel_delayed_work_sync(&battmgr->pps_keepalive_work);
 }
 
 static int qcom_battmgr_probe(struct auxiliary_device *adev,
@@ -1844,19 +2071,20 @@ static int qcom_battmgr_probe(struct auxiliary_device *adev,
 	psy_cfg_supply.supplied_to = qcom_battmgr_battery;
 	psy_cfg_supply.num_supplicants = 1;
 
-	INIT_WORK(&battmgr->enable_work, qcom_battmgr_enable_worker);
+	mutex_init(&battmgr->lock);
+	init_completion(&battmgr->ack);
+
 	INIT_WORK(&battmgr->otg_work, qcom_battmgr_oplus_otg_worker);
 	INIT_DELAYED_WORK(&battmgr->oplus_keepalive_work,
 			  qcom_battmgr_oplus_keepalive_worker);
-	mutex_init(&battmgr->lock);
-	init_completion(&battmgr->ack);
+	INIT_DELAYED_WORK(&battmgr->pps_keepalive_work,
+			  qcom_battmgr_pps_keepalive_worker);
+	dev_set_drvdata(dev, battmgr);
 
 	ret = devm_add_action_or_reset(dev, qcom_battmgr_oplus_keepalive_cancel,
 				       battmgr);
 	if (ret)
 		return ret;
-
-	dev_set_drvdata(dev, battmgr);
 
 	match = of_match_device(qcom_battmgr_of_variants, dev->parent);
 	if (match)
@@ -1932,6 +2160,11 @@ static int qcom_battmgr_probe(struct auxiliary_device *adev,
 						     "failed to register wireless charing power supply\n");
 		}
 	}
+
+	ret = devm_work_autocancel(dev, &battmgr->enable_work,
+				   qcom_battmgr_enable_worker);
+	if (ret)
+		return ret;
 
 	battmgr->client = devm_pmic_glink_client_alloc(dev, PMIC_GLINK_OWNER_BATTMGR,
 						       qcom_battmgr_callback,

@@ -802,6 +802,15 @@ config CHARGER_BQ24735
 	help
 	  Say Y to enable support for the TI BQ24735 battery charger.
 
+config CHARGER_SC8547
+	tristate "SC8547 charge pump driver"
+	depends on I2C
+	help
+	  Say Y to enable the SC8547 charge pump driver. This is used
+	  on some Oplus/OnePlus phones for high-power fast charging.
+
+	  To compile this driver as a module, choose M here.
+
 config CHARGER_BQ2515X
 	tristate "TI BQ2515X battery charger family"
 	depends on I2C

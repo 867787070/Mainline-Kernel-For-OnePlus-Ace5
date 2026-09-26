@@ -203,7 +203,7 @@ CFLAGS += -D_GNU_SOURCE=
 CFLAGS += -I${top_srcdir}/tools/testing/selftests
 
 # Enables to extend CFLAGS and LDFLAGS from command line, e.g.
-# make USERCFLAGS= USERLDFLAGS=-static
+# make USERCFLAGS=-Werror USERLDFLAGS=-static
 CFLAGS += $(USERCFLAGS)
 LDFLAGS += $(USERLDFLAGS)
 

@@ -2,7 +2,7 @@
 
 CFLAGS += -O3 -Wl,-no-as-needed -Wall -I $(top_srcdir)/usr/include
 ifneq ($(WERROR),0)
-	CFLAGS += 
+	CFLAGS += -Werror
 endif
 
 LDLIBS += -lpthread -lm -luring
@@ -69,6 +69,8 @@ TEST_PROGS += test_stress_08.sh
 TEST_PROGS += test_stress_09.sh
 
 TEST_FILES := settings
+TEST_FILES += test_common.sh
+TEST_FILES += trace
 
 TEST_GEN_PROGS_EXTENDED = kublk metadata_size
 STANDALONE_UTILS := metadata_size.c

@@ -6,7 +6,7 @@
 |:---------------------|:------------------------|:-----:|
 | Internal storage     |                         | ✅    |
 | Side buttons         |                         | ✅    |
-| Mute slider          |                         | ❌    |
+| Mute slider          | AK09970 hall + userspace daemon | ✅    |
 | Proximity sensor     |                         | ❌    |
 | Light sensor         |                         | ❌    |
 | Accelerometer        |                         | ❌    |
@@ -19,7 +19,7 @@
 | USB host             |                         | ✅    |
 | USB device           |                         | ✅    |
 | USB power delivery   |                         | ✅    |
-| Charging             | Takes ~2W               | ⚠️    |
+| Charging             |                         | ✅    |
 | WLAN                 | Uses random MAC         | ✅    |
 | CPU                  |                         | ✅    |
 | Touchscreen          | Off-tree                | ✅    |

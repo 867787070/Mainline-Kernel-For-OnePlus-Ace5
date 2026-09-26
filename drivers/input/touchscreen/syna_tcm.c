@@ -203,6 +203,9 @@ static int syna_tcm_read_header(struct syna_tcm *ts, u8 *code, u16 *length)
 	unsigned int retries;
 	int ret;
 
+	*code = TCM_STATUS_IDLE;
+	*length = 0;
+
 	for (retries = 10; retries; retries--) {
 		ret = spi_sync_transfer(ts->spi, &xfer, 1);
 		if (ret)
@@ -246,6 +249,10 @@ static int syna_tcm_read_message(struct syna_tcm *ts, u8 *code, u16 *length)
 		return ret;
 
 	total = hdr_len;
+	if (total > TCM_MAX_PAYLOAD)
+		dev_warn_ratelimited(&ts->spi->dev,
+				     "message 0x%02x truncated: %u > %u\n",
+				     *code, total, TCM_MAX_PAYLOAD);
 	*length = min_t(unsigned int, total, TCM_MAX_PAYLOAD);
 	if (!total)
 		return 0;
@@ -677,11 +684,16 @@ static int syna_tcm_start_application(struct syna_tcm *ts)
 	}
 
 	for (retries = 10; retries; retries--) {
+		memset(&app_info, 0, sizeof(app_info));
 		ret = syna_tcm_cmd(ts, TCM_CMD_GET_APPLICATION_INFO, NULL, 0,
 				   &app_info, sizeof(app_info));
 		if (ret < 0)
 			return dev_err_probe(dev, ret,
 					     "failed to get app info\n");
+		if (ret < 4)
+			return dev_err_probe(dev, -EIO,
+					     "short app info response: %d\n",
+					     ret);
 		if (le16_to_cpu(app_info.status) == TCM_APP_STATUS_OK)
 			break;
 		msleep(100);
@@ -693,8 +705,11 @@ static int syna_tcm_start_application(struct syna_tcm *ts)
 	ts->max_objects = min_t(unsigned int,
 				le16_to_cpu(app_info.max_objects),
 				TCM_MAX_OBJECTS);
-	if (!ts->max_objects)
+	if (!ts->max_objects) {
+		dev_warn(dev, "firmware reported 0 max objects, using %u\n",
+			 TCM_MAX_OBJECTS);
 		ts->max_objects = TCM_MAX_OBJECTS;
+	}
 
 	ret = syna_tcm_cmd(ts, TCM_CMD_GET_TOUCH_REPORT_CONFIG, NULL, 0,
 			   ts->config, sizeof(ts->config));
@@ -747,13 +762,15 @@ static int syna_tcm_probe(struct spi_device *spi)
 	if (ret)
 		return dev_err_probe(dev, ret, "failed to get regulators\n");
 
-	ts->reset_gpio = devm_gpiod_get_optional(dev, "reset",
-						 GPIOD_OUT_HIGH);
-	if (IS_ERR(ts->reset_gpio))
-		return dev_err_probe(dev, PTR_ERR(ts->reset_gpio),
-				     "failed to get reset GPIO\n");
-
-	ret = regulator_bulk_enable(ARRAY_SIZE(ts->supplies), ts->supplies);
+    ts->reset_gpio = devm_gpiod_get_optional(dev, "reset",
+    					 GPIOD_OUT_HIGH);
+    if (IS_ERR(ts->reset_gpio))
+    	return dev_err_probe(dev, PTR_ERR(ts->reset_gpio),
+    			     "failed to get reset GPIO\n");
+    if (!ts->reset_gpio)
+    	dev_warn(dev, "no reset GPIO, skipping reset\n");
+    
+    ret = regulator_bulk_enable(ARRAY_SIZE(ts->supplies), ts->supplies);
 	if (ret)
 		return dev_err_probe(dev, ret, "failed to enable regulators\n");
 
@@ -807,9 +824,12 @@ static int syna_tcm_probe(struct spi_device *spi)
 static int syna_tcm_suspend(struct device *dev)
 {
 	struct syna_tcm *ts = spi_get_drvdata(to_spi_device(dev));
+	int ret;
 
 	disable_irq(ts->spi->irq);
-	syna_tcm_cmd(ts, TCM_CMD_ENTER_DEEP_SLEEP, NULL, 0, NULL, 0);
+	ret = syna_tcm_cmd(ts, TCM_CMD_ENTER_DEEP_SLEEP, NULL, 0, NULL, 0);
+	if (ret < 0)
+		dev_warn(dev, "failed to enter deep sleep: %d\n", ret);
 
 	return 0;
 }
@@ -817,9 +837,14 @@ static int syna_tcm_suspend(struct device *dev)
 static int syna_tcm_resume(struct device *dev)
 {
 	struct syna_tcm *ts = spi_get_drvdata(to_spi_device(dev));
+	int ret;
 
-	syna_tcm_cmd(ts, TCM_CMD_EXIT_DEEP_SLEEP, NULL, 0, NULL, 0);
-	syna_tcm_cmd(ts, TCM_CMD_REZERO, NULL, 0, NULL, 0);
+	ret = syna_tcm_cmd(ts, TCM_CMD_EXIT_DEEP_SLEEP, NULL, 0, NULL, 0);
+	if (ret < 0)
+		dev_warn(dev, "failed to exit deep sleep: %d\n", ret);
+	ret = syna_tcm_cmd(ts, TCM_CMD_REZERO, NULL, 0, NULL, 0);
+	if (ret < 0)
+		dev_warn(dev, "failed to rezero: %d\n", ret);
 	enable_irq(ts->spi->irq);
 
 	return 0;
