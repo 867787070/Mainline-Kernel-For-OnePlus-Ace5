@@ -13,7 +13,7 @@
 | Gyroscope            |                         | ❌    |
 | Magnetometer         |                         | ❌    |
 | Fingerprint          |                         | ❌    |
-| NFC                  |                         | ❌    |
+| NFC                  | nxp-nci                 | ✅    |
 | Thermals             |                         | ✅    |
 | Battery              |                         | ✅    |
 | USB host             |                         | ✅    |
@@ -28,10 +28,10 @@
 | Speakers             | Off-tree                | ✅    |
 | Microphones          | Bottom MIC for now      | ⚠️    |
 | GPU                  |                         | ✅    |
-| Camera               |                         | ❌    |
-| Flash                |                         | ❌    |
+| Camera               | CAMSS up, sensor drivers missing | ❌    |
+| Flash                | pm8350c flash-led       | ✅    |
 | Calls                |                         | ❌    |
 | SMS                  |                         | ❌    |
-| Mobile Data          |                         | ❌    |
+| Mobile Data          | Needs IPA rules engine  | ❌    |
 | Display              | Off-tree                | ✅    |
-| Haptics              |                         | ❌    |
+| Haptics              | driver + userspace event daemon | ✅    |

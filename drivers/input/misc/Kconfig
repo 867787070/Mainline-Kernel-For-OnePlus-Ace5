@@ -225,6 +225,18 @@ config INPUT_PM8XXX_VIBRATOR
 	  To compile this driver as module, choose M here: the
 	  module will be called pm8xxx-vibrator.
 
+config INPUT_QCOM_HV_HAPTICS
+	tristate "Qualcomm PM8550B HV haptics support"
+	depends on MFD_SPMI_PMIC
+	select INPUT_FF_MEMLESS
+	help
+	  Driver for the Qualcomm High-Voltage Haptics block found in PM8550B
+	  (HAP525_HV).  It drives the LRA and exposes an input FF device with
+	  DIRECT_PLAY, pattern and FIFO playback plus LRA calibration.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called qcom-hv-haptics.
+
 config INPUT_PMIC8XXX_PWRKEY
 	tristate "PMIC8XXX power key support"
 	depends on MFD_PM8XXX
