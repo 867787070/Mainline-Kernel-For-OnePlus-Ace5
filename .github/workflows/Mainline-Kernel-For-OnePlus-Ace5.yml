@@ -1,0 +1,77 @@
+name: Build Linux 7.3 for OnePlus Ace5 (UEFI)
+
+on:
+  push:
+    paths:
+      - 'arch/arm64/**'
+      - 'config/**'
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libncurses-dev bc flex libssl-dev \
+          libelf-dev bison openssl dwarves cpio python3 python3-pip gcc-aarch64-linux-gnu
+
+    - name: Build kernel + dtb
+      run: |
+        set -e
+        rm -rf build
+        mkdir -p build
+        cd build
+        # 使用仓库自带的 defconfig
+        cp ../arch/arm64/configs/defconfig .config
+        # 启用 sm8650/giulia 设备树
+        sed -i '/^CONFIG_BUILD_DOCS$/a CONFIG_LOCALVERSION="-giulia"' .config
+        make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+        make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image dtbs modules
+
+    - name: Build firmware
+      run: |
+        set -e
+        cd build
+        make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- firmware
+
+    - name: Install modules
+      run: |
+        set -e
+        cd build
+        make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_install INSTALL_MOD_PATH=./modules
+
+    - name: 整理产物
+      run: |
+        set -e
+        cd build
+        mkdir -p dist
+        # 复制内核镜像
+        cp arch/arm64/boot/Image dist/
+        # 复制设备树
+        cp arch/arm64/boot/dts/qcom/sm8650-oneplus-giulia.dtb dist/
+        # 复制 firmware
+        cp -r firmware dist/
+        # 复制 modules
+        cp -r modules dist/
+        # 检查产物
+        ls -la dist/
+        echo "=== 文件清单 ==="
+        find dist -type f | head -50
+
+    - name: 上传产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-sm8650-giulia
+        path: build/dist/
+        retention-days: 7
