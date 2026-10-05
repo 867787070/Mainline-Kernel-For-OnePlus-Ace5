@@ -36,7 +36,8 @@ jobs:
         cp ../arch/arm64/configs/defconfig .config
         # 启用 sm8650/giulia 设备树
         sed -i '/^CONFIG_BUILD_DOCS$/a CONFIG_LOCALVERSION="-giulia"' .config
-        make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+        # Makefile 被精简过，没有定义 olddefconfig 目标，跳过这步（.config 已由 cp 准备好）
+        # make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
         make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image dtbs modules
 
     - name: Build firmware
