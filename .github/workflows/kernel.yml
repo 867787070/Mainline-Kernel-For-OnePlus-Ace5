@@ -1,0 +1,80 @@
+name: Build Linux 7.3 for OnePlus Ace5
+
+on:
+  push:
+    paths:
+      - 'arch/arm64/**'
+      - 'config/**'
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libncurses-dev bc flex libssl-dev \
+          libelf-dev bison openssl dwarves cpio python3 python3-pip
+
+    - name: Setup cross compiler
+      run: |
+        if ! command -v aarch64-linux-gnu-gcc &> /dev/null; then
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+        fi
+        echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
+        echo "ARCH=arm64" >> $GITHUB_ENV
+
+    - name: Build kernel
+      run: |
+        set -e
+        mkdir -p build
+        cd build
+        # Use the defconfig already in the repo
+        cp ../arch/arm64/configs/defconfig .config
+        make -j$(nproc) $CROSS_COMPILE $ARCH olddefconfig
+        make -j$(nproc) $CROSS_COMPILE $ARCH Image dtbs modules
+        make -j$(nproc) $CROSS_COMPILE $ARCH modules_install INSTALL_MOD_PATH=./modules
+
+    - name: Create initramfs-linux.img
+      run: |
+        set -e
+        cd build
+        rm -rf initramfs-root
+        mkdir -p initramfs-root/{bin,sbin,proc,sys,dev,etc}
+        cp init $CROSS_COMPILE $ARCH 2>/dev/null || true
+        cat > initramfs-root/init << 'EOF'
+#!/bin/sh
+mount -t proc none /proc 2>/dev/null
+mount -t sysfs none /sys 2>/dev/null
+mount -t devtmpfs none /dev 2>/dev/null
+echo "Starting switch_root to /newroot"
+exec switch_root /newroot /sbin/init || /bin/sh
+EOF
+        chmod +x initramfs-root/init
+        find initramfs-root | cpio -o -H newc 2>/dev/null | gzip -9 > initramfs-linux.img
+
+    - name: Upload all build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-artifacts
+        path: |
+          build/Image
+          build/arch/arm64/boot/dts/qcom/sm8650-oneplus-giulia.dtb
+          build/modules
+          build/initramfs-linux.img
+        retention-days: 7
