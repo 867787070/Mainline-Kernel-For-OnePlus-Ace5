@@ -4,7 +4,6 @@ on:
   push:
     paths:
       - 'arch/arm64/**'
-      - 'config/**'
       - '.github/workflows/*.yml'
   workflow_dispatch:
 
@@ -34,23 +33,25 @@ jobs:
         cd build
         # 使用仓库自带的 defconfig
         cp ../arch/arm64/configs/defconfig .config
-        # 启用 sm8650/giulia 设备树
-        sed -i '/^CONFIG_BUILD_DOCS$/a CONFIG_LOCALVERSION="-giulia"' .config
-        # Makefile 被精简过，没有定义 olddefconfig 目标，跳过这步（.config 已由 cp 准备好）
-        # make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
-        make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image dtbs modules
+        # 启用 sm8650/giulia 本地版本
+        echo "CONFIG_LOCALVERSION=-giulia" >> .config
+        # 同步 .config 到最新（Makefile 定义了该目标）
+        make -f ../Makefile -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+        make -f ../Makefile -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image dtbs modules
 
     - name: Build firmware
+      # firmware 为目标不存在于该仓库，作为可选项保留（set -e 下 || true 不会中断）；
+      # 如需固件请提前放入 build/firmware/ 目录或手动下载 Qualcomm blobs
       run: |
         set -e
         cd build
-        make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- firmware
+        make -f ../Makefile -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- firmware || true
 
     - name: Install modules
       run: |
         set -e
         cd build
-        make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_install INSTALL_MOD_PATH=./modules
+        make -f ../Makefile -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_install INSTALL_MOD_PATH=./modules
 
     - name: 整理产物
       run: |
@@ -61,8 +62,8 @@ jobs:
         cp arch/arm64/boot/Image dist/
         # 复制设备树
         cp arch/arm64/boot/dts/qcom/sm8650-oneplus-giulia.dtb dist/
-        # 复制 firmware
-        cp -r firmware dist/
+        # 复制 firmware（可选，目录不存在时跳过）
+        cp -r firmware dist/ || true
         # 复制 modules
         cp -r modules dist/
         # 检查产物
