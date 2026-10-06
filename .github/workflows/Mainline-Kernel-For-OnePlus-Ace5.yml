@@ -65,9 +65,10 @@ jobs:
         cp arch/arm64/boot/dts/qcom/sm8650-oneplus-giulia.dtb dist/
         # 3. 复制 firmware（可选，目录不存在时跳过）
         cp -r firmware dist/ || true
-        # 4. 复制 modules 并 strip 调试信息（节省 ~40%）
+        # 4. 复制 modules 并 strip 调试信息（xargs -P 并行批量，节省 ~40% 体积）
         cp -r modules dist/ || true
-        find dist/modules -name "*.ko" -exec aarch64-linux-gnu-strip --strip-debug {} \;
+        find dist/modules -name "*.ko" -print0 \
+          | xargs -0 -P "$(nproc)" -r aarch64-linux-gnu-strip --strip-debug
         echo "=== 产物大小（按类型）==="
         ls -lh dist/ && echo && echo "modules 大小:" && du -sh dist/modules/
         echo "=== 文件清单（前 30 条）==="
