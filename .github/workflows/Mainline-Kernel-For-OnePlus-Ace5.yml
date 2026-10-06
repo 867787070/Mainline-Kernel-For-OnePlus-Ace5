@@ -23,7 +23,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y build-essential libncurses-dev bc flex libssl-dev \
-          libelf-dev bison openssl dwarves cpio python3 python3-pip gcc-aarch64-linux-gnu
+          libelf-dev bison openssl dwarves cpio python3 python3-pip gcc-aarch64-linux-gnu zstd
 
     - name: Build kernel + dtb
       run: |
@@ -53,27 +53,39 @@ jobs:
         cd build
         make -f ../Makefile -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_install INSTALL_MOD_PATH=./modules
 
-    - name: 整理产物
+    - name: Strip and 整理产物
       run: |
         set -e
         cd build
         mkdir -p dist
-        # 复制内核镜像
+        # 1. 压缩 Image（可用 xz 或 zstd，zstd 更快）
         cp arch/arm64/boot/Image dist/
-        # 复制设备树
+        zstd -19 -T0 dist/Image -o dist/Image.zst
+        # 2. 复制设备树
         cp arch/arm64/boot/dts/qcom/sm8650-oneplus-giulia.dtb dist/
-        # 复制 firmware（可选，目录不存在时跳过）
+        # 3. 复制 firmware（可选，目录不存在时跳过）
         cp -r firmware dist/ || true
-        # 复制 modules
-        cp -r modules dist/
-        # 检查产物
-        ls -la dist/
-        echo "=== 文件清单 ==="
-        find dist -type f | head -50
+        # 4. 复制 modules 并 strip 调试信息（节省 ~40%）
+        cp -r modules dist/ || true
+        find dist/modules -name "*.ko" -exec aarch64-linux-gnu-strip --strip-debug {} \;
+        echo "=== 产物大小（按类型）==="
+        ls -lh dist/ && echo && echo "modules 大小:" && du -sh dist/modules/
+        echo "=== 文件清单（前 30 条）==="
+        find dist -type f | head -30
+
+    - name: 打包压缩产物
+      run: |
+        set -e
+        cd build/dist
+        tar cJf kernel-sm8650-giulia.tar.xz \
+          Image.zst \
+          sm8650-oneplus-giulia.dtb \
+          modules
+        ls -lh kernel-sm8650-giulia.tar.xz
 
     - name: 上传产物
       uses: actions/upload-artifact@v4
       with:
         name: kernel-sm8650-giulia
-        path: build/dist/
+        path: build/dist/kernel-sm8650-giulia.tar.xz
         retention-days: 7
